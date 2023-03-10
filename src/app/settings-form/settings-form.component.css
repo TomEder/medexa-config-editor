@@ -5,3 +5,7 @@
     text-align: center;
     color: slategray;
 }
+
+.xml-textarea-height {
+    height: 300px;
+  }
