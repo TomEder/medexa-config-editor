@@ -64,21 +64,55 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
           xmlDataList[i].getElementsByTagName('LabelName')[0].textContent;
         const type =
           xmlDataList[i].getElementsByTagName('InputType')[0].textContent;
-        const editingString =
-          xmlDataList[i].getElementsByTagName('Editing')[0].textContent;
-        const editing = editingString === 'true';
-        const input: Input = {
-          labelName: labelName || '',
-          inputType: type || '',
-          value: '',
-          selectOption1: '',
-          selectOption2: '',
-          selectOption3: '',
-          editing: editing,
-        };
-        this.inputs.push(input);
+        if (labelName && type) {
+          const editingString =
+            xmlDataList[i].getElementsByTagName('Editing')[0].textContent;
+          const editing = editingString === 'true';
+          const input: Input = {
+            labelName: labelName || '',
+            inputType: type || '',
+            value: '',
+            selectOption1: '',
+            selectOption2: '',
+            selectOption3: '',
+            editing: editing,
+          };
+          this.inputs.push(input);
+        }
       }
     };
+  }
+
+  async oFileUploaded() {
+    try {
+      const inputs = this.inputs;
+      for (const input of inputs) {
+        const response = await fetch('https://localhost:7149/Xml', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const data = await response.text();
+        if (data) {
+          const json = JSON.parse(data);
+          console.log('Success:', json);
+        } else {
+          console.log('Success: Empty response');
+        }
+      }
+      this.inputs = [];
+      this.labelName = '';
+      this.inputType = '';
+      this.selectOption1 = '';
+      this.selectOption2 = '';
+      this.selectOption3 = '';
+      this.value = '';
+    } catch (error) {
+      console.error('Error:', error);
+    }
   }
 
   async onSubmit() {
@@ -92,43 +126,6 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
       selectOption3: this.selectOption3,
       value: this.value,
     });
-
-    const inputData = {
-      ...this.inputs,
-      labelName: this.labelName,
-      inputType: this.inputType,
-      editing: false,
-      selectOption1: this.selectOption1,
-      selectOption2: this.selectOption2,
-      selectOption3: this.selectOption3,
-      value: this.value,
-    };
-    try {
-      const response = await fetch('https://localhost:7149/Xml', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inputData),
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
-      }
-      const data = await response.text();
-      if (data) {
-        const json = JSON.parse(data);
-        console.log('Success:', json);
-      } else {
-        console.log('Success: Empty response');
-      }
-      this.labelName = '';
-      this.inputType = '';
-      this.selectOption1 = '';
-      this.selectOption2 = '';
-      this.selectOption3 = '';
-      this.value = '';
-      console.log(this.inputs);
-    } catch (error) {
-      console.error('Error:', error);
-    }
   }
 
   onClearList() {
@@ -224,13 +221,31 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     });
   }
 
-  uploadXmlFile(xmlData: XMLDocument): Observable<any> {
+  /*   uploadXmlFile(inputs: Input[]): Observable<any> {
+    const xml = document.implementation.createDocument('', '', null);
+    const root = xml.createElement('ArrayOfXmlData');
+    xml.appendChild(root);
+
+    for (let input of inputs) {
+      const data = xml.createElement('XmlData');
+      const labelName = xml.createElement('LabelName');
+      labelName.textContent = input.labelName;
+      data.appendChild(labelName);
+      const inputType = xml.createElement('InputType');
+      inputType.textContent = input.inputType;
+      data.appendChild(inputType);
+      const editing = xml.createElement('Editing');
+      editing.textContent = input.editing ? 'true' : 'false';
+      data.appendChild(editing);
+      root.appendChild(data);
+    }
+
     const xmlString = new XMLSerializer().serializeToString(
-      xmlData.documentElement
+      xml.documentElement
     );
     const url = 'https://localhost:7149/Xml/upload';
     return this.http.post(url, xmlString, {
       headers: { 'Content-Type': 'text/xml' },
     });
-  }
+  } */
 }
