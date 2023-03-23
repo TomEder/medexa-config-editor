@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, ViewChild, OnInit, ElementRef, OnDestroy, Renderer2 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { XmlService } from '../xml.service';
@@ -28,11 +28,24 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     value: any;
   }[] = [];
 
+  xmlInputs: 
+  {
+    labelName: string;
+    inputType: string;
+    selectOption1: string;
+    selectOption2: string;
+    selectOption3: string;
+    editing: boolean;
+    value: any;
+  }[] = [];
+
+  @ViewChild('dynamicParagraph', {static: true}) dynamicParagraph: ElementRef;
+
   showModal = false;
 
   xmlData: any;
 
-  constructor(private http: HttpClient, private xmlService: XmlService) {}
+  constructor(private http: HttpClient, private xmlService: XmlService, private renderer: Renderer2) {}
 
   ngOnInit() {
     const storedInputs = localStorage.getItem('inputs');
@@ -87,7 +100,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     try {
       const inputs = this.inputs;
       for (const input of inputs) {
-        const response = await fetch('https://localhost:7149/Xml', {
+        const response = await fetch('https://localhost:5001/Xml', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(input),
@@ -101,6 +114,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
           console.log('Success:', json);
         } else {
           console.log('Success: Empty response');
+          alert('Xml file uploaded');
         }
       }
       this.inputs = [];
@@ -176,11 +190,12 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     // Generate XML file with inputs and configuration element
     const version = '1.0';
     const serverID = '1234567890';
-    let xmlString = `<?xml version="${version}"?>\n<root>\n  <configuration version="${version}" serverID="${serverID}">\n`;
+    const encoding = 'utf-8'
+    let xmlString = `<?xml version="${version}"? encoding="${encoding}">\n  <configuration version="${version}" serverID="${serverID}">\n <appSettings> \n`;
     this.inputs.forEach((input) => {
-      xmlString += `    <appSettings>\n      <add>\n        <${input.inputType} name="${input.labelName}">${input.value}</${input.inputType}>\n      </add>\n    </appSettings>\n`;
+      xmlString += `<add key="${input.labelName}" value="${input.value}"/>\n`;
     });
-    xmlString += '  </configuration>\n</root>';
+    xmlString += '  </appSettings>\n</configuration>';
 
     // Set the XML string in the textarea inside the modal
     $('#xml-textarea').val(xmlString);
@@ -197,18 +212,23 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
   onSaveXmlFile() {
     const version = '1.0';
     const configVersion = '2.0';
+    const encoding = 'utf-8'
     const serverID = '1234567890';
-    let xmlString = `<?xml version="${version}"?>\n<root>\n  <configuration version="${configVersion}" serverID="${serverID}">\n`;
+    let xmlString = `<?xml version="${version}"? encoding="${encoding}">\n  <configuration version="${version}" serverID="${serverID}">\n <appSettings> \n`;
     this.inputs.forEach((input) => {
-      xmlString += `    <appSettings>\n      <add>\n        <${input.inputType} name="${input.labelName}">${input.value}</${input.inputType}>\n      </add>\n    </appSettings>\n`;
+      xmlString += `    <add key="${input.labelName}" value="${input.value}"/>\n`;
     });
-    xmlString += '  </configuration>\n</root>';
+    xmlString += ' </appSettings>\n</configuration>';
     const blob = new Blob([xmlString], { type: 'application/xml' });
     const downloadLink = document.createElement('a');
     downloadLink.href = URL.createObjectURL(blob);
     downloadLink.download = 'config.xml';
     downloadLink.click();
     URL.revokeObjectURL(downloadLink.href);
+
+    const successMessage = document.createElement('p');
+  successMessage.innerHTML = 'Config file saved successfully.';
+  document.body.appendChild(successMessage);
   }
 
   onUploadXmlFile() {
@@ -218,8 +238,13 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
 
     this.xmlService.uploadXmlFile(xmlData).subscribe((response) => {
       console.log('File uploaded successfully', response);
+      const message = this.renderer.createText('File uploaded successfully');
+      const paragraph = this.renderer.createElement('p');
+      this.renderer.appendChild(paragraph, message);
+      this.renderer.appendChild(this.dynamicParagraph.nativeElement, paragraph);
     });
   }
+}
 
   /*   uploadXmlFile(inputs: Input[]): Observable<any> {
     const xml = document.implementation.createDocument('', '', null);
@@ -248,4 +273,4 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
       headers: { 'Content-Type': 'text/xml' },
     });
   } */
-}
+
