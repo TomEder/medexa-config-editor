@@ -1,4 +1,11 @@
-import { Component, ViewChild, OnInit, ElementRef, OnDestroy, Renderer2 } from '@angular/core';
+import {
+  Component,
+  ViewChild,
+  OnInit,
+  ElementRef,
+  OnDestroy,
+  Renderer2,
+} from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { XmlService } from '../xml.service';
@@ -28,8 +35,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     value: any;
   }[] = [];
 
-  xmlInputs: 
-  {
+  xmlInputs: {
     labelName: string;
     inputType: string;
     selectOption1: string;
@@ -39,13 +45,17 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     value: any;
   }[] = [];
 
-  @ViewChild('dynamicParagraph', {static: true}) dynamicParagraph: ElementRef;
+  @ViewChild('dynamicParagraph', { static: true }) dynamicParagraph: ElementRef;
 
   showModal = false;
 
   xmlData: any;
 
-  constructor(private http: HttpClient, private xmlService: XmlService, private renderer: Renderer2) {}
+  constructor(
+    private http: HttpClient,
+    private xmlService: XmlService,
+    private renderer: Renderer2
+  ) {}
 
   ngOnInit() {
     const storedInputs = localStorage.getItem('inputs');
@@ -71,26 +81,29 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
         fileReader.result as string,
         'text/xml'
       );
-      const xmlDataList = xml.getElementsByTagName('XmlData');
+      const xmlDataList = xml.getElementsByTagName('add');
       for (let i = 0; i < xmlDataList.length; i++) {
-        const labelName =
-          xmlDataList[i].getElementsByTagName('LabelName')[0].textContent;
-        const type =
-          xmlDataList[i].getElementsByTagName('InputType')[0].textContent;
-        if (labelName && type) {
-          const editingString =
-            xmlDataList[i].getElementsByTagName('Editing')[0].textContent;
-          const editing = editingString === 'true';
+        const labelName = xmlDataList[i].getAttribute('key');
+        const value = xmlDataList[i].getAttribute('value');
+        const type = xmlDataList[i].getAttribute('InputType');
+        if (labelName && value) {
+          const selectOption1 =
+            xmlDataList[i].getAttribute('selectOption1') || '';
+          const selectOption2 =
+            xmlDataList[i].getAttribute('selectOption2') || '';
+          const selectOption3 =
+            xmlDataList[i].getAttribute('selectOption3') || '';
+          const editing = false;
           const input: Input = {
             labelName: labelName || '',
             inputType: type || '',
-            value: '',
-            selectOption1: '',
-            selectOption2: '',
-            selectOption3: '',
+            value: value,
+            selectOption1: selectOption1,
+            selectOption2: selectOption2,
+            selectOption3: selectOption3,
             editing: editing,
           };
-          this.inputs.push(input);
+          this.xmlInputs.push(input);
         }
       }
     };
@@ -100,7 +113,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     try {
       const inputs = this.inputs;
       for (const input of inputs) {
-        const response = await fetch('https://localhost:5001/Xml', {
+        const response = await fetch('https://localhost:7149/Xml', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(input),
@@ -190,7 +203,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     // Generate XML file with inputs and configuration element
     const version = '1.0';
     const serverID = '1234567890';
-    const encoding = 'utf-8'
+    const encoding = 'utf-8';
     let xmlString = `<?xml version="${version}"? encoding="${encoding}">\n  <configuration version="${version}" serverID="${serverID}">\n <appSettings> \n`;
     this.inputs.forEach((input) => {
       xmlString += `<add key="${input.labelName}" value="${input.value}"/>\n`;
@@ -212,7 +225,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
   onSaveXmlFile() {
     const version = '1.0';
     const configVersion = '2.0';
-    const encoding = 'utf-8'
+    const encoding = 'utf-8';
     const serverID = '1234567890';
     let xmlString = `<?xml version="${version}"? encoding="${encoding}">\n  <configuration version="${version}" serverID="${serverID}">\n <appSettings> \n`;
     this.inputs.forEach((input) => {
@@ -227,8 +240,8 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     URL.revokeObjectURL(downloadLink.href);
 
     const successMessage = document.createElement('p');
-  successMessage.innerHTML = 'Config file saved successfully.';
-  document.body.appendChild(successMessage);
+    successMessage.innerHTML = 'Config file saved successfully.';
+    document.body.appendChild(successMessage);
   }
 
   onUploadXmlFile() {
@@ -244,33 +257,8 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
       this.renderer.appendChild(this.dynamicParagraph.nativeElement, paragraph);
     });
   }
+  onAddToList(index: number) {
+    this.inputs.push(this.xmlInputs[index]);
+    this.xmlInputs.splice(index, 1);
+  }
 }
-
-  /*   uploadXmlFile(inputs: Input[]): Observable<any> {
-    const xml = document.implementation.createDocument('', '', null);
-    const root = xml.createElement('ArrayOfXmlData');
-    xml.appendChild(root);
-
-    for (let input of inputs) {
-      const data = xml.createElement('XmlData');
-      const labelName = xml.createElement('LabelName');
-      labelName.textContent = input.labelName;
-      data.appendChild(labelName);
-      const inputType = xml.createElement('InputType');
-      inputType.textContent = input.inputType;
-      data.appendChild(inputType);
-      const editing = xml.createElement('Editing');
-      editing.textContent = input.editing ? 'true' : 'false';
-      data.appendChild(editing);
-      root.appendChild(data);
-    }
-
-    const xmlString = new XMLSerializer().serializeToString(
-      xml.documentElement
-    );
-    const url = 'https://localhost:7149/Xml/upload';
-    return this.http.post(url, xmlString, {
-      headers: { 'Content-Type': 'text/xml' },
-    });
-  } */
-
