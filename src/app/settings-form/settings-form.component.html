@@ -3,7 +3,7 @@
 <div
   class="justify-content-center text-center h-fit pb-4 bg-gray-300 rounded-md"
 >
-  <form (ngSubmit)="onSubmit()" class="max-w-lg mx-auto">
+  <form (ngSubmit)="onSubmit()" class="max-w-xl mx-auto">
     <div class="my-4">
       <label for="labelNameInput" class="block text-gray-500 mb-2"
         >Namn på config:</label
@@ -56,17 +56,18 @@
       />
     </div>
 
-    <div class="my-4 flex justify-center">
+    <div class="my-4 flex flex-col items-center justify-center">
       <button
         type="submit"
         class="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition duration-200"
       >
-        Add Input
+        Lägg till config
       </button>
       <label for="xmlFileInput" class="block text-red-500 mb-2"
-        >Ladda upp XML-fil:</label
+        >Eller ladda upp XML-fil:</label
       >
       <input
+        class="ml-32"
         type="file"
         id="xmlFileInput"
         (change)="onFileSelected($event)"
@@ -88,24 +89,30 @@
   <button
     type="button"
     class="bg-orange-500 rounded-md p-2 mr-3 text-white hover:bg-orange-600"
-    (click)="oFileUploaded()"
+    (click)="oFileUploaded(); onClearConfig()"
   >
     Post Uploaded File 
   </button>
-
   <button
-    (click)="onClearConfig(); onClearList()"
+    type="button"
+    class="bg-orange-500 rounded-md p-2 mr-3 text-white hover:bg-orange-600"
+    (click)="onSaveSettings()"
+  >
+    Spara mall
+  </button>
+  <button
+    (click)="onClearList(); onClearConfig()"
     class="bg-orange-500 rounded-md p-2 text-white hover:bg-orange-600"
   >
     Rensa Lista
   </button>
 </div>
-<div class="listsContainer">
+<div class="w-full">
   <ul class="list-group bg-gray-300 justify-content-between rounded-md">
     <div class="container p-4">
       <li
         *ngFor="let input of inputs; let i = index"
-        class="bg-gray-400 rounded-md max-w-xl my-2 ml-6 p-1"
+        class="bg-gray-400 rounded-md max-w-4xl my-2 ml-8 p-1"
       >
         <label class="mr-3 text-white">{{ input.labelName }}</label>
         <ng-container *ngIf="!input.editing">
@@ -134,7 +141,7 @@
               <input
                 type="checkbox"
                 class="px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-gray-500 focus:shadow-outline-red"
-                [(ngModel)]="input.value"
+                [checked]="input.value === 'true'"
               />
               <label class="form-check-label"></label>
             </div>
@@ -168,7 +175,6 @@
             <label for="" class="text-white">Namn:</label>
             <input
               [(ngModel)]="input.labelName"
-              [(ngModel)]="input.value"
               class="ml-3 w-60 h-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:border-gray-500 focus:shadow-outline-red"
             />
             <div *ngIf="input.inputType === 'Select'">
@@ -241,21 +247,29 @@
       </li>
     </div>
   </ul>
-  <h4 *ngIf="xmlInputs.length > 0">Uppladdade configs:</h4>
-  <ul class="list-group bg-gray-300 justify-content-between rounded-md">
-    <li
-      *ngFor="let xmlInput of xmlInputs; let i = index"
-      class="bg-gray-400 rounded-md max-w-xl my-2 ml-6 p-1"
-    >
-      <p class="text-white">{{ xmlInput.labelName }}</p>
-      <p class="text-white">{{ xmlInput.value }}</p>
-      <button
-        class="bg-orange-500 rounded-md p-1 text-white"
-        (click)="onAddToList(i)"
+  <h4 *ngIf="xmlInputs.length > 0">Uppladdade configs 1:</h4>
+  <ul class="list-group bg-gray-200 p-1 justify-content-between rounded-md">
+    <div class="container p-4">
+      <li
+        *ngFor="let xmlInput of xmlInputs; let i = index"
+        class="bg-gray-400 rounded-md max-w-4xl my-2 ml-8 p-1"
       >
-        Lägg till
-      </button>
-    </li>
+        <p class="text-white">{{ xmlInput.labelName }}</p>
+        <p class="text-white">{{ xmlInput.value }}</p>
+        <button
+          class="bg-orange-500 rounded-md p-1 text-white"
+          (click)="onAddFromFirstList(i)"
+        >
+          Lägg till
+        </button>
+        <button
+          class="bg-orange-500 rounded-md p-1 ml-1 text-white"
+          (click)="onDeleteFromFirstList(i)"
+        >
+          Ta bort
+        </button>
+      </li>
+    </div>
   </ul>
 </div>
 

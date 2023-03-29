@@ -7,7 +7,6 @@ import {
   Renderer2,
 } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
 import { XmlService } from '../xml.service';
 import { Input } from './input.model';
 
@@ -86,7 +85,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
         const labelName = xmlDataList[i].getAttribute('key');
         const value = xmlDataList[i].getAttribute('value');
         const type = xmlDataList[i].getAttribute('InputType');
-        if (labelName && value) {
+        if (labelName) {
           const selectOption1 =
             xmlDataList[i].getAttribute('selectOption1') || '';
           const selectOption2 =
@@ -103,7 +102,22 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
             selectOption3: selectOption3,
             editing: editing,
           };
-          this.xmlInputs.push(input);
+          const index = this.inputs.findIndex(
+            (input) => input.labelName === labelName
+          );
+          if (index !== -1) {
+            // If an input with the same labelName already exists in the inputs array, update its value and remove the input from xmlInputs
+            this.inputs[index].value = value;
+            const xmlIndex = this.xmlInputs.findIndex(
+              (input) => input.labelName === labelName
+            );
+            if (xmlIndex !== -1) {
+              this.xmlInputs.splice(xmlIndex, 1);
+            }
+          } else {
+            // Otherwise, add the input to xmlInputs
+            this.xmlInputs.push(input);
+          }
         }
       }
     };
@@ -127,9 +141,9 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
           console.log('Success:', json);
         } else {
           console.log('Success: Empty response');
-          alert('Xml file uploaded');
         }
       }
+      alert('Xml file uploaded');
       this.inputs = [];
       this.labelName = '';
       this.inputType = '';
@@ -157,6 +171,11 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
 
   onClearList() {
     this.inputs = [];
+    this.xmlInputs = [];
+  }
+
+  onClearXmlList() {
+    this.xmlInputs = [];
   }
 
   onSaveSettings() {
@@ -172,13 +191,16 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
   }
 
   onUpdateInput(index: number) {
-    localStorage.setItem('inputs', JSON.stringify(this.inputs));
     this.inputs[index].editing = false;
   }
 
   onDeleteInput(index: number) {
     this.inputs.splice(index, 1);
     console.log(this.inputs);
+  }
+
+  onDeleteFromFirstList(index: number) {
+    this.xmlInputs.splice(index, 1);
   }
 
   onInputChangeType(index: number, inputType: string) {
@@ -257,8 +279,16 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
       this.renderer.appendChild(this.dynamicParagraph.nativeElement, paragraph);
     });
   }
-  onAddToList(index: number) {
-    this.inputs.push(this.xmlInputs[index]);
-    this.xmlInputs.splice(index, 1);
+  onAddFromFirstList(index: number) {
+    const selectedInput = this.xmlInputs[index];
+    const isDuplicate = this.inputs.some(
+      (input) => input.labelName === selectedInput.labelName
+    );
+    if (isDuplicate) {
+      window.alert('Can not add duplicate config');
+    } else {
+      this.inputs.push(selectedInput);
+      this.xmlInputs.splice(index, 1);
+    }
   }
 }
