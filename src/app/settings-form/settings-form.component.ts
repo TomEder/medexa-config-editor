@@ -9,6 +9,9 @@ import {
 import { HttpClient } from '@angular/common/http';
 import { XmlService } from '../xml.service';
 import { Input } from './input.model';
+import { Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
+import { XmlInput } from './xmlInput';
 
 declare const $: any;
 
@@ -24,15 +27,6 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
   selectOption2: string;
   selectOption3: string;
   value: any;
-  inputs: {
-    labelName: string;
-    inputType: string;
-    selectOption1: string;
-    selectOption2: string;
-    selectOption3: string;
-    editing: boolean;
-    value: any;
-  }[] = [];
 
   xmlInputs: {
     labelName: string;
@@ -43,6 +37,8 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     editing: boolean;
     value: any;
   }[] = [];
+
+  inputSuggestions: XmlInput[] = [];
 
   @ViewChild('dynamicParagraph', { static: true }) dynamicParagraph: ElementRef;
 
@@ -56,16 +52,81 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     private renderer: Renderer2
   ) {}
 
-  ngOnInit() {
-    const storedInputs = localStorage.getItem('inputs');
-    if (storedInputs) {
-      this.inputs = [...JSON.parse(storedInputs)];
+  saveInput(): void {
+    const input = {
+      labelName: this.labelName,
+      inputType: this.inputType,
+      selectOption1: this.selectOption1,
+      selectOption2: this.selectOption2,
+      selectOption3: this.selectOption3,
+      editing: false,
+      value: this.value,
+    };
+    this.xmlService.saveInput(input).subscribe(() => {
+      this.fetchInputs(); // Call fetchInputs to retrieve the latest data after making a POST request
+    });
+  }
+
+  fetchInputs() {
+    const timestamp = new Date().getTime();
+    this.http
+      .get<XmlInput[]>(
+        `https://localhost:7149/xml/GetXmlData?timestamp=${timestamp}`
+      )
+      .subscribe((data) => {
+        this.xmlInputs = data.map((input) => ({
+          labelName: input.labelName,
+          inputType: input.inputType,
+          selectOption1: this.selectOption1,
+          selectOption2: this.selectOption2,
+          selectOption3: this.selectOption3,
+          editing: false,
+          value:
+            typeof input.value === 'object' && input.value !== null
+              ? ''
+              : input.value,
+        }));
+      });
+  }
+
+  async ngOnInit(): Promise<void> {
+    try {
+      const response = await this.http
+        .get<XmlInput[]>('https://localhost:7149/xml/GetXmlData')
+        .toPromise();
+      this.xmlInputs = response!.map((input) => ({
+        labelName: input.labelName,
+        inputType: input.inputType,
+        selectOption1: input.selectOption1,
+        selectOption2: input.selectOption2,
+        selectOption3: input.selectOption3,
+        editing: false,
+        value: input.value === null ? '' : input.value, // Add conditional statement here
+      }));
+      console.log('successful get!', this.xmlInputs);
+    } catch (error) {
+      console.error(error);
     }
   }
 
+  onAddList() {
+    const newInput: XmlInput = {
+      labelName: '',
+      inputType: 'text',
+      selectOption1: '',
+      selectOption2: '',
+      selectOption3: '',
+      editing: false,
+      value: '',
+    };
+    this.http.post('/xml/PostData', newInput).subscribe(() => {
+      this.xmlInputs.push(newInput);
+    });
+  }
+
   ngOnDestroy() {
-    if (this.inputs.length > 0) {
-      localStorage.setItem('inputs', JSON.stringify(this.inputs));
+    if (this.xmlInputs.length > 0) {
+      localStorage.setItem('inputs', JSON.stringify(this.xmlInputs));
     }
   }
 
@@ -93,7 +154,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
           const selectOption3 =
             xmlDataList[i].getAttribute('selectOption3') || '';
           const editing = false;
-          const input: Input = {
+          const input: XmlInput = {
             labelName: labelName || '',
             inputType: type || '',
             value: value,
@@ -102,63 +163,58 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
             selectOption3: selectOption3,
             editing: editing,
           };
-          const index = this.inputs.findIndex(
-            (input) => input.labelName === labelName
+          const existingInputs = this.xmlInputs.filter(
+            (xmlInput) => input.labelName === xmlInput.labelName
           );
-          if (index !== -1) {
+          if (existingInputs.length > 0) {
             // If an input with the same labelName already exists in the inputs array, update its value and remove the input from xmlInputs
-            this.inputs[index].value = value;
-            const xmlIndex = this.xmlInputs.findIndex(
-              (input) => input.labelName === labelName
-            );
-            if (xmlIndex !== -1) {
-              this.xmlInputs.splice(xmlIndex, 1);
-            }
+            existingInputs.forEach((existingInput) => {
+              existingInput.value = value;
+              const xmlIndex = this.xmlInputs.findIndex(
+                (input) => input.labelName === existingInput.labelName
+              );
+              if (xmlIndex !== -1) {
+                this.xmlInputs.splice(xmlIndex, 1);
+              }
+            });
           } else {
             // Otherwise, add the input to xmlInputs
-            this.xmlInputs.push(input);
+            this.inputSuggestions.push(input);
           }
         }
       }
     };
   }
 
-  async oFileUploaded() {
+  onAddToList(index: number) {
+    const selectedInput = this.inputSuggestions[index];
+    const isDuplicate = this.xmlInputs.some(
+      (input) => input.labelName === selectedInput.labelName
+    );
+    if (isDuplicate) {
+      window.alert('Can not add duplicate config');
+    } else {
+      this.xmlInputs.push(selectedInput);
+      this.inputSuggestions.splice(index, 1);
+    }
+  }
+
+  async onTemplateSave() {
     try {
-      const inputs = this.inputs;
-      for (const input of inputs) {
-        const response = await fetch('https://localhost:7149/Xml', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(input),
-        });
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        const data = await response.text();
-        if (data) {
-          const json = JSON.parse(data);
-          console.log('Success:', json);
-        } else {
-          console.log('Success: Empty response');
-        }
-      }
-      alert('Xml file uploaded');
-      this.inputs = [];
-      this.labelName = '';
-      this.inputType = '';
-      this.selectOption1 = '';
-      this.selectOption2 = '';
-      this.selectOption3 = '';
-      this.value = '';
+      const response = await this.http
+        .post('https://localhost:7149/Xml/UpdateXmlData', this.xmlInputs)
+        .toPromise();
+      console.log('Data uploaded successfully:', response, this.xmlInputs);
+      // do something after successful upload
+      alert('Xml template saved');
     } catch (error) {
-      console.error('Error:', error);
+      console.error('Error uploading data:', error);
+      // handle error
     }
   }
 
   async onSubmit() {
-    this.inputs.push({
-      ...this.inputs,
+    const input = {
       labelName: this.labelName,
       inputType: this.inputType,
       editing: false,
@@ -166,12 +222,19 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
       selectOption2: this.selectOption2,
       selectOption3: this.selectOption3,
       value: this.value,
-    });
+    };
+    console.log('Submitting input:', input);
+    this.xmlInputs.push(input);
+    this.labelName = '';
+    this.inputType = '';
+    this.selectOption1 = '';
+    this.selectOption2 = '';
+    this.selectOption3 = '';
+    this.value = '';
   }
 
   onClearList() {
-    this.inputs = [];
-    this.xmlInputs = [];
+    this.xmlInputs.forEach((input) => (input.value = ''));
   }
 
   onClearXmlList() {
@@ -179,7 +242,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
   }
 
   onSaveSettings() {
-    localStorage.setItem('inputs', JSON.stringify(this.inputs));
+    localStorage.setItem('inputs', JSON.stringify(this.xmlInputs));
   }
 
   onClearConfig() {
@@ -187,16 +250,16 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
   }
 
   onEditInput(index: number) {
-    this.inputs[index].editing = true;
+    this.xmlInputs[index].editing = true;
   }
 
   onUpdateInput(index: number) {
-    this.inputs[index].editing = false;
+    this.xmlInputs[index].editing = false;
   }
 
   onDeleteInput(index: number) {
-    this.inputs.splice(index, 1);
-    console.log(this.inputs);
+    this.xmlInputs.splice(index, 1);
+    console.log(this.xmlInputs);
   }
 
   onDeleteFromFirstList(index: number) {
@@ -204,11 +267,11 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
   }
 
   onInputChangeType(index: number, inputType: string) {
-    this.inputs[index].inputType = inputType;
+    this.xmlInputs[index].inputType = inputType;
   }
 
   onInputChangeLabelName(index: number, labelName: string) {
-    this.inputs[index].labelName = labelName;
+    this.xmlInputs[index].labelName = labelName;
   }
   onInputChangeSelectOptions(
     index: number,
@@ -216,9 +279,9 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     selectOption2: string,
     selectOption3: string
   ) {
-    this.inputs[index].selectOption1 = selectOption1;
-    this.inputs[index].selectOption2 = selectOption2;
-    this.inputs[index].selectOption3 = selectOption3;
+    this.xmlInputs[index].selectOption1 = selectOption1;
+    this.xmlInputs[index].selectOption2 = selectOption2;
+    this.xmlInputs[index].selectOption3 = selectOption3;
   }
 
   openXmlModal() {
@@ -227,7 +290,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     const serverID = '1234567890';
     const encoding = 'utf-8';
     let xmlString = `<?xml version="${version}"? encoding="${encoding}">\n  <configuration version="${version}" serverID="${serverID}">\n <appSettings> \n`;
-    this.inputs.forEach((input) => {
+    this.xmlInputs.forEach((input) => {
       xmlString += `<add key="${input.labelName}" value="${input.value}"/>\n`;
     });
     xmlString += '  </appSettings>\n</configuration>';
@@ -242,6 +305,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
 
     // Open the modal
     $('#xml-modal').modal('show');
+    console.log(this.xmlInputs);
   }
 
   onSaveXmlFile() {
@@ -250,8 +314,8 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     const encoding = 'utf-8';
     const serverID = '1234567890';
     let xmlString = `<?xml version="${version}"? encoding="${encoding}">\n  <configuration version="${version}" serverID="${serverID}">\n <appSettings> \n`;
-    this.inputs.forEach((input) => {
-      xmlString += `    <add key="${input.labelName}" value="${input.value}"/>\n`;
+    this.xmlInputs.forEach((input) => {
+      xmlString += `    <add key="${input.labelName}" value="${input.value}"/>\n`;
     });
     xmlString += ' </appSettings>\n</configuration>';
     const blob = new Blob([xmlString], { type: 'application/xml' });
@@ -266,7 +330,7 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
     document.body.appendChild(successMessage);
   }
 
-  onUploadXmlFile() {
+  /* onUploadXmlFile() {
     const xmlString = $('#xml-textarea').val();
     const parser = new DOMParser();
     const xmlData = parser.parseFromString(xmlString, 'application/xml');
@@ -278,17 +342,23 @@ export class SettingsFormComponent implements OnInit, OnDestroy {
       this.renderer.appendChild(paragraph, message);
       this.renderer.appendChild(this.dynamicParagraph.nativeElement, paragraph);
     });
-  }
+  } */
+
   onAddFromFirstList(index: number) {
     const selectedInput = this.xmlInputs[index];
-    const isDuplicate = this.inputs.some(
+    const isDuplicate = this.xmlInputs.some(
       (input) => input.labelName === selectedInput.labelName
     );
     if (isDuplicate) {
       window.alert('Can not add duplicate config');
     } else {
-      this.inputs.push(selectedInput);
+      this.xmlInputs.push(selectedInput);
       this.xmlInputs.splice(index, 1);
     }
+  }
+
+  onAddAllXml() {
+    this.xmlInputs.push(...this.xmlInputs);
+    console.log(this.xmlInputs);
   }
 }
